@@ -35,6 +35,7 @@ def main(argv=None):
     parser.add_argument("--condition", choices=["both", "incremental", "whole_once"], default="both")
     parser.add_argument("--output-dir", type=Path)
     parser.add_argument("--cache-dir", type=Path)
+    parser.add_argument('--approved-budget-usd',type=float,help='User-approved live-call budget in USD')
     args = parser.parse_args(argv)
     cfg = load_config(args.config)
     policy_path = project_path(cfg.paths.evaluation_policy)
@@ -108,6 +109,10 @@ def main(argv=None):
                 from para_agent.llm.anthropic_transport import AnthropicTransport
                 transport_type = AnthropicTransport
             transport = transport_type(cfg.llm.agent, project_path(cfg.llm.env_file), max_calls=expected_calls * 3)
+            if args.approved_budget_usd is not None:
+                from para_agent.eval.costs import BudgetTransport
+                rates=yaml.safe_load((PROJECT_ROOT/'configs/api_pricing_2026-10-15.yaml').read_text())['models'][cfg.llm.agent.model]
+                transport=BudgetTransport(transport,rates,args.approved_budget_usd)
             diagnoser = build_diagnoser(cfg, log_path=run / "diagnostic_calls.jsonl")
         client = Client(model=cfg.llm.agent, transport=transport, prompts=prompts,
                         cache=cache, call_log=run / "llm_calls.jsonl")
@@ -132,6 +137,8 @@ def main(argv=None):
         rows = [json.loads(line) for line in (run / "llm_calls.jsonl").read_text().splitlines()]
         turns = [json.loads(p.read_text()) for p in run.glob('*/*/turn_*.json')]
         report.update(latency_s=time.perf_counter() - started,
+                      approved_budget_usd=args.approved_budget_usd,
+                      estimated_billed_usd=getattr(transport,'spent_usd',None),
                       failed_anonymization_turns=sum(t.get('turn_status')=='failed_anonymization' for t in turns),
                       rejected_error_notes=sum(t.get('memory_update_validation',{}).get('rejected_count',0) for t in turns),
                       mock_transport_calls=transport.call_count if transport and args.mock else 0,

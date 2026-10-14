@@ -14,6 +14,7 @@ class ModelConfig(Schema):
     model: str
     temperature: float | None = 0
     reasoning_effort: Literal["none", "low", "medium", "high", "xhigh", "max"] | None = None
+    thinking_mode: Literal['adaptive', 'disabled', 'between_tools'] | None = None
     max_output_tokens: int = Field(default=8192, ge=1)
     timeout_s: float = Field(default=180, gt=0)
 

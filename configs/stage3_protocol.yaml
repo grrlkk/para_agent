@@ -1,0 +1,64 @@
+version: stage3_luna_v1
+agent_model: gpt-6-luna
+judge_family: anthropic
+judge_model: null  # Select only after all three validation gates have results.
+judge_candidates: [claude-haiku-5-5, claude-sonnet-5-5]
+judge_selection: cheapest_candidate_passing_all_three_gates_else_stop
+judge_settings: [configs/judge_haiku55.yaml, configs/judge_sonnet55.yaml]
+no_post_result_reasoning_retest: true
+development_ids:
+  - 14-3-A2-M-0C-0122
+  - 14-2-M1-N-0A-E-0215
+  - 14-2-E5-N-0C-F-0084
+  - 14-2-E5-N-0B-F-0284
+  - 14-2-M1-C-0C-E-1504
+historical_haiku_runs:
+  - runs/20261014T111644.364558Z_61faf37a02
+  - runs/20261014T104152.627997Z_ecfbfbe8db
+  - runs/20261014T103217.773696Z_5f8ab97267
+  - runs/20261014T095651.042158Z_3931618173
+human_validation:
+  seed: 315042
+  semantic_pairs: 50
+  target_luna_semantic_pairs: 25
+  target_haiku_risk_candidates: 20
+  pairwise_pairs: 20
+  pairwise_source: heldout_originals_same_exact_prompt_large_human_score_gap
+  minimum_human_total_gap: 16
+  minimum_paragraphs: 3
+  maximum_paragraphs: 6
+  disjoint_essay_ids: true
+  exclude_pilots_and_calibration100_and_stage5: true
+  reserve_pairwise_ids_from_future_stage5: true
+  controlled_semantic_pairs: 80
+  blind: [agent_model, condition, source_run, judge_label, sampling_reason]
+  semantic_binary_map:
+    보존: 보존
+    경미한 뉘앙스 변화: 변화
+    의미 변화: 변화
+  semantic_kappa_minimum: 0.6
+  pairwise_agreement_minimum: 0.7
+  gate_uses: point_estimate  # CI is reported separately; no post-result threshold changes.
+  pairwise_labels: [A, B, 동률]
+  pairwise_gate_denominator: all_40_ordered_judgments
+  pairwise_ties: incorrect
+  pairwise_both_orders_correct_rate: report_separately
+  pairwise_limitation: human_score_ordering_of_different_originals_does_not_validate_revisions_of_the_same_essay
+  controlled_semantic_kappa_minimum: 0.6
+  confidence_interval: essay_cluster_percentile_bootstrap_95
+  bootstrap_resamples: 10000
+  clustering: actual_semantics_by_essay_id_controlled_by_rule_family_pairwise_by_prompt
+  same_essay_dependence: report_5_essay_limit_and_item_level_CI_as_secondary
+metrics:
+  meaning_preservation_rate: preserved_changed_pairs_divided_by_all_changed_pairs
+  no_changed_pairs: null_with_zero_denominator
+  style_consistency: matching_dominant_styles_divided_by_classifiable_adjacent_paragraph_pairs
+  style_unknown: exclude_adjacent_pair_if_either_dominant_is_other_and_report_coverage
+  fallback_rate: failed_anonymization_turns_divided_by_revision_turns
+  memory_note_discard_rate: rejected_notes_divided_by_candidate_notes
+  issue_mismatch_rate: location_applied_skipped_mismatches_divided_by_issues
+  baseline_pooling: luna_only_keep_haiku_separate
+api:
+  estimate_and_user_approval_required: true
+  generate_agent_baseline_before_judge: true
+  judge_generated_requests_must_be_costed_before_dispatch: true

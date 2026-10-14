@@ -35,7 +35,7 @@ def test_mock_end_to_end_and_cache(tmp_path, capsys, contracts, cfg, diag_unit):
     assert first_stdout["mock_transport_calls"] == 25
     snapshot = yaml.safe_load((first / "config.yaml").read_text())
     assert snapshot["provenance"]["mock"] is True
-    assert len(snapshot["provenance"]["prompt_hashes"]) == 5
+    assert set(snapshot['provenance']['prompt_hashes']) == {p.name for p in (PROJECT_ROOT/'prompts').glob('*.md')}
     originals = [json.loads(line) for line in (PROJECT_ROOT / "tests/fixtures/mock_essays.jsonl").read_text().splitlines()]
     for essay in originals:
         paragraphs = essay["paragraphs"]

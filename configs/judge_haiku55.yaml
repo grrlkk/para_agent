@@ -1,0 +1,7 @@
+provider: anthropic
+model: claude-haiku-5-5
+temperature: null
+thinking_mode: disabled
+reasoning_effort: low
+max_output_tokens: 2048
+timeout_s: 180

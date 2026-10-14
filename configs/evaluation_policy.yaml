@@ -1,4 +1,4 @@
-version: post_stage1_5_v1
+version: stage3_luna_validation_v1
 primary_metrics: [cross_family_pairwise_judge, meaning_preservation_rate]
 auxiliary_metrics: [kanana_smoothed_integer_n64, kanana_greedy, style_consistency, edit_amount, cost]
 kanana:
@@ -30,15 +30,33 @@ judge:
   different_family_from_agent: true
   pairwise_orders: [whole_once_first, incremental_first]
   allow_tie: true
-  model_selection: ask_user_before_stage3_api_calls
+  agent_model: gpt-6-luna
+  model_selection: cheapest_candidate_passing_all_three_gates_else_stop
+  candidates: [claude-haiku-5-5, claude-sonnet-5-5]
+  protocol: configs/stage3_protocol.yaml
+  no_post_result_reasoning_retest: true
+  pairwise_validation:
+    label_source: human_original_scores_same_exact_prompt
+    pairs: 20
+    ordered_judgments: 40
+    minimum_total_gap: 16
+    threshold: 0.7
+    ties: incorrect
+    excludes: [pilots_10, calibration_100, stage5_evaluation]
+    limitation: does_not_validate_revisions_of_the_same_essay
+  controlled_semantic_validation:
+    pairs: 80
+    binary_kappa_minimum: 0.6
+    label_source: deterministic_transform_rules
   human_agreement:
     required_in_stage: 3
     status: pending
-    label_source: null
-    sample_size: null
-    agreement_threshold: null
-    tasks: [pairwise_preference, three_class_meaning_preservation]
-    report: [exact_agreement_rate, confusion_matrix, disagreement_examples]
+    label_source: user_labels_of_blinded_actual_luna_and_historical_haiku_revisions
+    sample_size: 50
+    agreement_threshold: 0.6
+    tasks: [binary_meaning_preservation_kappa]
+    label_map: {보존: 보존, 경미한 뉘앙스 변화: 변화, 의미 변화: 변화}
+    report: [cohen_kappa, cluster_bootstrap_95_ci, item_bootstrap_95_ci, confusion_matrix, disagreement_examples]
     freeze_sample_and_rules_before_judge_results: true
     completion_requires_actual_human_labels: true
 live_calls:

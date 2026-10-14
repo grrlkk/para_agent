@@ -1,4 +1,6 @@
-# para_agent — v0 / 3단계
+# para_agent — 문단 단위 작문 진단·수정 실험
+
+현재는 2026-10-14 보고서 이후의 **후속 3단계: Luna 기준선·Claude judge 검증 준비**를 진행 중이다. [현재 보고서](STAGE3_PREPARATION_2026-10-15.md)와 [활성 평가 계획](EVALUATION_PLAN_POST_STAGE1_5.md)을 우선 참조한다. 아래에는 원래 명세의 구현 이력과 과거 실행 결과도 보존한다.
 
 기준은 [IMPLEMENTATION_SPEC.md](../imple/IMPLEMENTATION_SPEC.md)다. **0단계 mock 실행, 1단계 실제 진단 어댑터, 2단계 테스트 파일럿 추출, 3단계 실제 LLM 수정 경로**를 구현했다. 3단계는 지정된 파일럿 5편에서만 실행하며 평가는 4단계다.
 

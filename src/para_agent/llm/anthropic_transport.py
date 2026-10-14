@@ -12,8 +12,13 @@ class AnthropicTransport:
     def __init__(self, model, env_file: Path, *, sdk_client=None, max_calls=228):
         if model.provider != self.provider:
             raise ValueError("Anthropic transport requires provider=anthropic")
-        if model.model == "claude-haiku-5-5" and model.temperature is not None:
-            raise ValueError("Haiku 5.5 requires temperature=null; omission needs an explicit config choice")
+        if model.model in {'claude-haiku-5-5','claude-sonnet-5-5'} and model.temperature is not None:
+            raise ValueError("Claude 5.5 requires temperature=null; omission needs an explicit config choice")
+        if model.model=='claude-sonnet-5-5' and (model.thinking_mode=='disabled' or
+                (model.thinking_mode is None and model.reasoning_effort=='none')):
+            raise ValueError('Sonnet 5.5 requires between_tools to omit up-front thinking')
+        if model.thinking_mode in {'disabled','between_tools'} and model.reasoning_effort in {'xhigh','max'}:
+            raise ValueError('Thinking-off modes require effort high or below')
         self.model, self.call_count, self.max_calls = model, 0, max_calls
         self.last_metadata, self.last_usage = {}, {}
         if sdk_client is None:
@@ -36,7 +41,11 @@ class AnthropicTransport:
         if self.model.temperature is not None:
             # anthropic >=1 moved deprecated sampling arguments to extra_body.
             params["extra_body"] = {"temperature": self.model.temperature}
-        if self.model.reasoning_effort == "none":
+        if self.model.thinking_mode is not None:
+            params['thinking']={'type':self.model.thinking_mode}
+            if self.model.reasoning_effort not in (None,'none'):
+                params['output_config']['effort']=self.model.reasoning_effort
+        elif self.model.reasoning_effort == "none":
             params["thinking"] = {"type": "disabled"}
         elif self.model.reasoning_effort is not None:
             params["thinking"] = {"type": "adaptive"}

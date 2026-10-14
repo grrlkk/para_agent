@@ -73,7 +73,7 @@ def write_summary(output, source, essays, rows, statistics, acceptance, rubric_k
                   "Wilcoxon은 양측 검정, 0 차이 제외, 동률 평균 순위, 작은 표본에서는 모든 부호 순열을 사용합니다. "
                   "p값은 다중 비교 보정 전 탐색 결과입니다. 모든 비교의 CI/p값은 statistics.json에 저장합니다.",
                   "5편 결과만으로 일반적인 우열을 확정할 수 없습니다. 점수는 의미 보존이나 지시 준수를 보장하지 않습니다.",
-                  "LLM judge: 미실행. 현재 저장 결과의 agent는 Claude이며, 다른 계열 judge 설정이 확정되지 않았습니다.",
+                  "LLM judge: 이 로컬 평가에서는 미실행. 다른 계열 judge의 검증·선택 결과는 별도로 확인해야 합니다.",
                   "명세상 미정이었던 편집 거리 분모와 bootstrap 설정은 위와 같이 명시했습니다. "
                   "기존 수정 결과·프롬프트·채점기·자질 코드·KB를 변경하지 않았습니다."])
     with (output / "summary.md").open("x", encoding="utf-8") as handle:
