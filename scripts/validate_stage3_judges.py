@@ -10,6 +10,7 @@ sys.path.insert(0,str(PROJECT/'src'));sys.dont_write_bytecode=True
 from para_agent.artifacts import write_json,file_hash
 from para_agent.eval.agreement import semantic_agreement,pairwise_agreement,select_judge
 from para_agent.eval.labeling import read_human_labels
+from para_agent.eval.fixed_validation import validate_fixed_sonnet, compare_claude_reference
 
 
 def load_results(paths,model,data_dir):
@@ -32,10 +33,24 @@ def main(argv=None):
     p.add_argument('--haiku-results',type=Path,nargs='*',default=[])
     p.add_argument('--sonnet-results',type=Path,nargs='*',default=[])
     p.add_argument('--human-labels',type=Path)
+    p.add_argument('--claude-reference',type=Path)
     p.add_argument('--output',type=Path,required=True)
     args=p.parse_args(argv)
     controlled=json.loads((args.data_dir/'private/controlled.json').read_text())
     pairs=json.loads((args.data_dir/'private/original_pairs.json').read_text())
+    setup=json.loads((args.data_dir/'setup.json').read_text())
+    if setup.get('protocol',{}).get('judge_selection')=='user_fixed_sonnet_two_gates_else_stop':
+        if args.human_labels or args.haiku_results:
+            raise ValueError('The current policy fixes Sonnet and excludes human revision labels')
+        index=load_results(args.sonnet_results,'claude-sonnet-5-5',args.data_dir)
+        rows=[{'scope':s,'item_id':k,'reverse':r,'result':v,'model':'claude-sonnet-5-5'}
+              for (s,k,r),v in index.items()]
+        result=validate_fixed_sonnet(controlled,pairs,[r for r in rows if r['scope'] in ('controlled','original_pairs')])
+        if args.claude_reference and result['passes']:
+            actual=json.loads((args.data_dir/'private/actual_semantics.json').read_text())
+            result['reference_agreement']=compare_claude_reference(actual,
+                [r for r in rows if r['scope']=='actual_semantics'],args.claude_reference)
+        write_json(args.output,result);print(json.dumps(result,ensure_ascii=False));return
     human=None;actual=[]
     if args.human_labels:
         actual=json.loads((args.data_dir/'private/actual_semantics.json').read_text())

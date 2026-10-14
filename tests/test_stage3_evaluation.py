@@ -121,7 +121,7 @@ def test_blind_judge_payloads_and_reverse_winner_mapping():
             assert not set(payload) & {'gold', 'agent_model', 'human_scores', 'condition'}
             data = {
                 k: {'winner': '동률' if k == 'meaning' else 'A', 'reason': '글에 근거한 이유'}
-                for k in ('style', 'coherence', 'meaning', 'overall')}
+                for k in ('style', 'correction_accuracy', 'meaning', 'overall')}
             data['content_addition'] = {side: {'status': '판단불가', 'added_spans': [], 'reason': '원문 미제공'}
                                         for side in ('A', 'B')}
             return PairwiseJudgment.model_validate(data)

@@ -1,4 +1,4 @@
-version: stage3_luna_validation_v1
+version: stage3_b_sonnet_fixed_no_human_v1
 primary_metrics: [cross_family_pairwise_judge, meaning_preservation_rate]
 auxiliary_metrics: [kanana_smoothed_integer_n64, kanana_greedy, style_consistency, edit_amount, cost]
 kanana:
@@ -31,8 +31,14 @@ judge:
   pairwise_orders: [whole_once_first, incremental_first]
   allow_tie: true
   agent_model: gpt-6-luna
-  model_selection: cheapest_candidate_passing_all_three_gates_else_stop
-  candidates: [claude-haiku-5-5, claude-sonnet-5-5]
+  model: claude-sonnet-5-5
+  model_selection: user_fixed_sonnet_two_gates_else_stop
+  candidates: [claude-sonnet-5-5]
+  model_choice_before_validation_results: true
+  no_human_labels_decision_before_results: true
+  required_validation_gates: [pairwise, controlled_semantic]
+  actual_revision_limitation: 실제 수정에 대한 judge 판정은 사람으로 검증하지 않았다
+  reference_agreement: same_family_Claude_auxiliary_only_not_independent_human_validation
   protocol: configs/stage3_protocol.yaml
   no_post_result_reasoning_retest: true
   pairwise_validation:
@@ -49,16 +55,16 @@ judge:
     binary_kappa_minimum: 0.6
     label_source: deterministic_transform_rules
   human_agreement:
-    required_in_stage: 3
-    status: pending
-    label_source: user_labels_of_blinded_actual_luna_and_historical_haiku_revisions
+    required_in_stage: null
+    status: not_performed_by_user_decision_before_validation_results
+    label_source: none
     sample_size: 50
-    agreement_threshold: 0.6
-    tasks: [binary_meaning_preservation_kappa]
+    agreement_threshold: null
+    tasks: []
     label_map: {보존: 보존, 경미한 뉘앙스 변화: 변화, 의미 변화: 변화}
-    report: [cohen_kappa, cluster_bootstrap_95_ci, item_bootstrap_95_ci, confusion_matrix, disagreement_examples]
+    report: []
     freeze_sample_and_rules_before_judge_results: true
-    completion_requires_actual_human_labels: true
+    completion_requires_actual_human_labels: false
 live_calls:
   estimate_call_count_and_cost_first: true
   explicit_user_approval_required: true

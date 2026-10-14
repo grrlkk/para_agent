@@ -27,8 +27,8 @@ class Preference(Schema):
 
 
 class PairwiseJudgment(Schema):
+    correction_accuracy: Preference
     style: Preference
-    coherence: Preference
     meaning: Preference
     overall: Preference
     content_addition: ComparedAdditions
@@ -69,15 +69,23 @@ def validate_addition(value,text,*,original_available=True):
 def judge_pairwise(client,item,*,context,reverse=False):
     payload=pairwise_payload(item,reverse=reverse)
     def validate(result):
-        if item.get('original') is None and result.meaning.winner != '동률':
-            raise ValueError('Original text unavailable: meaning preservation cannot be compared')
-        for side in ('A','B'):
-            validate_addition(getattr(result.content_addition,side),payload[side],
-                              original_available=item.get('original') is not None)
+        validate_pairwise_result(result,payload)
     result=client.request('judge_pairwise',payload,PairwiseJudgment,context=context,validate=validate)
+    return canonical_pairwise(result,reverse)
+
+
+def validate_pairwise_result(result,payload):
+    if payload.get('original') is None and result.meaning.winner != '동률':
+        raise ValueError('Original text unavailable: meaning preservation cannot be compared')
+    for side in ('A','B'):
+        validate_addition(getattr(result.content_addition,side),payload[side],
+                          original_available=payload.get('original') is not None)
+
+
+def canonical_pairwise(result,reverse):
     canonical={
         key:{'winner':restore_order(value.winner,reverse),'reason':value.reason}
-        for key,value in ((k,getattr(result,k)) for k in ('style','coherence','meaning','overall'))}
+        for key,value in ((k,getattr(result,k)) for k in ('correction_accuracy','meaning','style','overall'))}
     canonical['content_addition']={side:getattr(result.content_addition,restore_order(side,reverse)).model_dump()
                                    for side in ('A','B')}
     return {'displayed':result.model_dump(),'canonical':canonical}

@@ -13,6 +13,17 @@ def load_evaluation_policy(path: Path):
               'record_greedy':True,'conditional_expectation_average':False}
     if k!=expected:
         raise ValueError('Kanana evaluation settings differ from the approved N64 policy')
-    if not policy['decision']['post_result_selection'] or policy['judge']['human_agreement']['required_in_stage']!=3:
-        raise ValueError('Must record post-result selection and required stage-3 human agreement validation')
+    if not policy['decision']['post_result_selection']:
+        raise ValueError('Must record post-result Kanana selection')
+    judge=policy['judge']
+    if judge['model_selection']=='user_fixed_sonnet_two_gates_else_stop':
+        if (judge['model']!='claude-sonnet-5-5' or
+            judge['required_validation_gates']!=['pairwise','controlled_semantic'] or
+            not judge['model_choice_before_validation_results'] or
+            not judge['no_human_labels_decision_before_results'] or
+            judge['human_agreement']['completion_requires_actual_human_labels'] or
+            judge['actual_revision_limitation']!='실제 수정에 대한 judge 판정은 사람으로 검증하지 않았다'):
+            raise ValueError('Fixed Sonnet policy must record both gates and unvalidated human-revision limitation')
+    elif judge['human_agreement']['required_in_stage']!=3:
+        raise ValueError('Historical policy requires stage-3 human agreement validation')
     return policy

@@ -29,12 +29,14 @@ def main(argv=None):
     config_path=PROJECT/f'configs/judge_{args.model}55.yaml'
     model=ModelConfig.model_validate(yaml.safe_load(config_path.read_text()))
     setup=json.loads((args.data_dir/'setup.json').read_text())
+    fixed=setup.get('protocol',{}).get('judge_selection')=='user_fixed_sonnet_two_gates_else_stop'
+    if fixed and args.model!='sonnet':raise ValueError('The judge was fixed to Sonnet before validation')
     for name,digest in setup['source_hashes'].items():
         if file_hash(PROJECT/name)!=digest:raise ValueError('Protocol, model settings, or judge prompts changed after freezing')
-    if any(s.startswith('luna_') for s in args.scope) and args.execute:
+    if (any(s.startswith('luna_') for s in args.scope) or (fixed and 'actual_semantics' in args.scope)) and args.execute:
         if not args.selection:raise ValueError('A validated selected judge is required before baseline judging')
         decision=json.loads(args.selection.read_text())['selection']
-        if decision['status']!='selected' or decision['model']!=model.model:raise ValueError('Judge has not passed all gates')
+        if decision['status']!='selected' or decision['model']!=model.model:raise ValueError('Judge has not passed required validation gates')
     if len(set(args.scope))!=len(args.scope):raise ValueError('Duplicate scope')
     rates=yaml.safe_load((PROJECT/'configs/api_pricing_2026-10-15.yaml').read_text())['models'][model.model]
     # A supplied SDK stub prevents key loading/network creation during costing.

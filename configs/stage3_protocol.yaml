@@ -1,10 +1,17 @@
-version: stage3_luna_v2_judge_content_flags
+version: stage3_b_sonnet_fixed_no_human_v1
 agent_model: gpt-6-luna
 judge_family: anthropic
-judge_model: null  # Select only after all three validation gates have results.
-judge_candidates: [claude-haiku-5-5, claude-sonnet-5-5]
-judge_selection: cheapest_candidate_passing_all_three_gates_else_stop
-judge_settings: [configs/judge_haiku55.yaml, configs/judge_sonnet55.yaml]
+judge_model: claude-sonnet-5-5
+judge_candidates: [claude-sonnet-5-5]
+judge_selection: user_fixed_sonnet_two_gates_else_stop
+judge_settings: [configs/judge_sonnet55.yaml]
+model_choice_before_validation_results: true
+no_human_labels_decision_before_results: true
+human_revision_validation: not_performed_by_user_decision
+human_revision_limitation: 실제 수정에 대한 judge 판정은 사람으로 검증하지 않았다
+required_validation_gates: [pairwise, controlled_semantic]
+actual_semantics_after_gates: judge_only_no_human_agreement
+claude_reference_agreement: same_family_auxiliary_only_not_a_gate
 no_post_result_reasoning_retest: true
 development_ids:
   - 14-3-A2-M-0C-0122
@@ -17,7 +24,7 @@ historical_haiku_runs:
   - runs/20261014T104152.627997Z_ecfbfbe8db
   - runs/20261014T103217.773696Z_5f8ab97267
   - runs/20261014T095651.042158Z_3931618173
-human_validation:
+human_validation:  # Saved sample construction settings; actual human labeling is not performed.
   seed: 315042
   semantic_pairs: 50
   target_luna_semantic_pairs: 25
@@ -36,7 +43,7 @@ human_validation:
     보존: 보존
     경미한 뉘앙스 변화: 변화
     의미 변화: 변화
-  semantic_kappa_minimum: 0.6
+  human_revision_kappa_required: false
   pairwise_agreement_minimum: 0.7
   gate_uses: point_estimate  # CI is reported separately; no post-result threshold changes.
   pairwise_labels: [A, B, 동률]
@@ -62,3 +69,7 @@ api:
   estimate_and_user_approval_required: true
   generate_agent_baseline_before_judge: true
   judge_generated_requests_must_be_costed_before_dispatch: true
+  approved_validation_budget_usd: 3.0
+  batch_discount: 0.5
+  prompt_cache_ttl: 1h
+  validation_then_actual_semantics: true

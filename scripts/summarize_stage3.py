@@ -61,7 +61,7 @@ def build_report(data_dir, *, kanana=None, selection=None, judge_results=()):
         validation = json.loads(selection.read_text())
         decision = validation['selection']
         if decision['status'] != 'selected':
-            raise ValueError('Judge has not passed all three gates')
+            raise ValueError('Judge has not passed required validation gates')
         index = load_results(judge_results, decision['model'], data_dir)
         changes = json.loads((data_dir / 'private/luna_semantics.json').read_text())
         pairs = json.loads((data_dir / 'private/luna_pairs.json').read_text())
@@ -82,6 +82,9 @@ def build_report(data_dir, *, kanana=None, selection=None, judge_results=()):
         report['judge_status'] = 'validated_and_evaluated'
         report['primary_evaluation_complete'] = True
         report['judge_model'] = decision['model']
+        report['human_revision_validation'] = validation.get('human_labels_status', 'unknown')
+        if validation.get('limitation'):
+            report['judge_validation_limitation'] = validation['limitation']
         report['source_hashes']['selection'] = file_hash(selection)
         report['baseline_judge_estimated_usd'] = sum(
             json.loads((p / 'acceptance.json').read_text())['estimated_billed_usd'] for p in judge_results)

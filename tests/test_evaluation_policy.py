@@ -13,13 +13,17 @@ from para_agent.eval.kanana import AuxiliaryKananaScorer
 from para_agent.eval.policy import load_evaluation_policy
 
 
-def test_approved_policy_records_post_result_choice_and_human_validation():
+def test_approved_policy_records_post_result_kanana_and_pre_result_fixed_judge():
     policy=load_evaluation_policy(PROJECT_ROOT/'configs/evaluation_policy.yaml')
     assert policy['decision']['original_n32_primary_adoption_rule']=='failed'
     assert policy['decision']['post_result_selection'] is True
     assert policy['decision']['confirmatory_experiment']=='not_requested_and_not_run'
-    assert policy['judge']['human_agreement']['required_in_stage']==3
-    assert policy['judge']['human_agreement']['completion_requires_actual_human_labels']
+    assert policy['judge']['model']=='claude-sonnet-5-5'
+    assert policy['judge']['model_choice_before_validation_results']
+    assert policy['judge']['no_human_labels_decision_before_results']
+    assert not policy['judge']['human_agreement']['completion_requires_actual_human_labels']
+    assert policy['judge']['required_validation_gates']==['pairwise','controlled_semantic']
+    assert '사람으로 검증하지 않았다' in policy['judge']['actual_revision_limitation']
     historical=yaml.safe_load((PROJECT_ROOT/'configs/smoothed_scoring.yaml').read_text())
     assert historical['sampling']['primary_n']==32
 

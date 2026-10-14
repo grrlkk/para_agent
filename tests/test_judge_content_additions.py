@@ -46,7 +46,7 @@ def test_semantic_judge_rejects_missing_invented_or_inconsistent_evidence(value)
 
 def pair_response(a, b, meaning='동률'):
     result = {key: {'winner': meaning if key == 'meaning' else 'A', 'reason': '판정 근거'}
-              for key in ('style', 'coherence', 'meaning', 'overall')}
+              for key in ('style', 'correction_accuracy', 'meaning', 'overall')}
     result['content_addition'] = {'A': a, 'B': b}
     return result
 
