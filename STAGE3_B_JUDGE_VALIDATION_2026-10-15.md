@@ -21,10 +21,10 @@
 | 단계 | 정상 요청 수 | 캐시 적중 없는 예상 비용 |
 |---|---:|---:|
 | 규칙 80 + 원문 양방향 40 | 120 | $0.863121 |
-| 통과 후 실제 수정 | 50 | $0.3223775 |
-| 통과 시 합계 | 170 | **$1.1854985** |
+| 통과 후 실제 수정 — 일반 API | 50 | $0.644755 |
+| 통과 시 합계 | 170 | **$1.507876** |
 
-Batch 50% 할인, 1시간 시스템 프롬프트 캐시를 적용한다. 입력은 UTF-8 바이트/2와 프로토콜 여유분, 출력은 의미 256·쌍대 640토큰으로 예상했다. 제출 전에는 더 보수적인 입력 상한과 최대 출력 2,048토큰으로 요청 금액을 확보한다. 형식 재요청 최대 2회/항목을 허용하지만 전체 예산은 항상 $3.00이다. 초기 검증 120개의 상한 확보액은 $2.740002이고, 실제 지출이 확인된 후 남은 예산으로 다음 요청을 제출한다. 캐시 적중은 보장하지 않는다. [공식 가격](https://platform.claude.com/docs/en/about-claude/pricing)
+검증 120건은 Batch 50% 할인, 실제 수정 50쌍은 일반 API이며 두 경로 모두 1시간 시스템 프롬프트 캐시를 적용한다. 최초 계획은 모두 Batch로 $1.1854985였으나 검증 결과를 보기 전 사용자의 추가 지시로 실제 수정 50쌍만 일반 API로 바꿨다. 원래 `setup.json`·`plan.json`은 보존하고 변경 요청·새 코드 해시·수정 비용은 `execution_amendment_01.json`에 별도로 기록했다. 기존 Batch를 취소하거나 중복 제출하지 않고 같은 ID의 결과를 이어받는다. 입력은 UTF-8 바이트/2와 프로토콜 여유분, 출력은 의미 256·쌍대 640토큰으로 예상했다. 제출 전에는 더 보수적인 입력 상한과 최대 출력 2,048토큰으로 요청 금액을 확보한다. 형식 재요청 최대 2회/항목을 허용하지만 전체 예산은 항상 $3.00이다. 초기 검증 120개의 상한 확보액은 $2.740002이고, 실제 지출이 확인된 후 남은 예산으로 다음 요청을 제출한다. 캐시 적중은 보장하지 않는다. [공식 가격](https://platform.claude.com/docs/en/about-claude/pricing)
 
 ## 실행 명령과 준비 결과
 
@@ -34,12 +34,18 @@ PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=src /home/chanwoo/anaconda3/envs/feak_agent
 git diff --check
 ```
 
-테스트 **206개 통과**. API 없는 준비에서 검증 120회·조건부 실제 수정 50회와 예상 비용을 산출했다. diff 공백 검사 통과. 예산의 단계 간 공유, 제출 전 예산 확보, 비순차 Batch 결과 대응, 정답·조건 숨김, 두 기준 중 실패 시 후속 호출 차단을 테스트했다. 채점기·자질 코드·KB에는 수정하지 않았다.
+최초 테스트 206개, 일반 API 경로와 Batch 이어받기 추가 후 **208개 통과**. API 없는 준비에서 검증 120회·조건부 실제 수정 50회와 예상 비용을 산출했다. diff 공백 검사 통과. 예산의 단계 간 공유, 제출 전 예산 확보, 비순차 Batch 결과 대응, 정답·조건 숨김, 두 기준 중 실패 시 후속 호출 차단을 테스트했다. 채점기·자질 코드·KB에는 수정하지 않았다.
 
 승인된 실행 명령:
 
 ```bash
 PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=src /home/chanwoo/anaconda3/envs/feak_agent/bin/python scripts/validate_sonnet_batch.py --data-dir runs/sonnet_validation_20261014T183046Z --execute --approved-budget-usd 3.00
+```
+
+사용자 지시에 따른 실행 방식 변경 후 이어받기 명령:
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=src /home/chanwoo/anaconda3/envs/feak_agent/bin/python scripts/validate_sonnet_batch.py --data-dir runs/sonnet_validation_20261014T183046Z --execute --approved-budget-usd 3.00 --resume-validation
 ```
 
 ## 해석이 필요했던 점

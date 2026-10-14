@@ -72,6 +72,11 @@ class FakeBatches:
                 'model':MODEL,'stop_reason':'end_turn','content':[{'type':'text','text':json.dumps(response())}],
                 'usage':{'input_tokens':100,'output_tokens':50}}}})
 
+    def retrieve(self,batch_id):
+        value=Dump({'id':batch_id,'processing_status':'ended'})
+        value.id=batch_id;value.processing_status='ended'
+        return value
+
 
 def test_runner_reserves_before_dispatch_and_handles_unordered_results(tmp_path,rates):
     jobs=make_jobs('controlled',[semantic_item(i) for i in range(3)],model(),PROJECT_ROOT/'prompts',rates)
@@ -157,7 +162,8 @@ def test_orchestrator_only_submits_actual_pairs_after_both_gates_pass(tmp_path,m
     class Runner:
         spent=.4;requests=120;http_posts=1
         def __init__(self,*args,**kwargs): pass
-        def run_phase(self,name,jobs,hashes): phases.append(name);return []
+        def run_phase(self,name,jobs,hashes,**kwargs): phases.append(name);return []
+        def run_standard_phase(self,name,jobs,hashes): phases.append(name);return []
     monkeypatch.setattr(script,'BatchRunner',Runner)
     monkeypatch.setattr(script,'AnthropicTransport',lambda *a,**k:SimpleNamespace(client=object(),close=lambda:None))
     monkeypatch.setattr(script,'validate_fixed_sonnet',lambda *a,**k:{'passes':passed})
@@ -175,3 +181,40 @@ def test_budget_is_shared_across_phases(tmp_path,rates):
     with pytest.raises(RuntimeError,match='cannot reserve'):
         runner.run_phase('actual',jobs,{})
     assert len(batches.submissions)==1 and runner.requests==1
+
+
+def test_resume_retrieves_accepted_batch_without_second_submission(tmp_path,rates):
+    jobs=make_jobs('controlled',[semantic_item()],model(),PROJECT_ROOT/'prompts',rates)
+    wire=[{'custom_id':'j0000','params':jobs[0]['params']}]
+    batches=FakeBatches();accepted=batches.create(requests=wire)
+    folder=tmp_path/'validation/batches/001'
+    write_json(folder/'batch.json',accepted.model_dump())
+    write_json(folder/'dispatch_intent.json',{'requests':wire,'spent_before_usd':0})
+    runner=BatchRunner(SimpleNamespace(messages=SimpleNamespace(batches=batches)),rates,3,tmp_path,'repair')
+    rows=runner.run_phase('validation',jobs,{},resume_pending=True)
+    assert len(batches.submissions)==1 and runner.http_posts==0
+    assert runner.requests==1 and len(rows)==1 and runner.spent==pytest.approx(.00035)
+
+
+def test_standard_phase_never_uses_batch_and_shares_full_price_budget(tmp_path,rates):
+    class Messages:
+        def __init__(self): self.calls=[]
+        def create(self,**params):
+            self.calls.append(params)
+            return Dump({'model':MODEL,'stop_reason':'end_turn',
+                'content':[{'type':'text','text':json.dumps(response())}],
+                'usage':{'input_tokens':100,'output_tokens':50}})
+    messages=Messages();runner=BatchRunner(SimpleNamespace(messages=messages),rates,3,tmp_path,'repair')
+    runner.spent=.4;runner.requests=120
+    jobs=make_jobs('actual_semantics',[semantic_item()],model(),PROJECT_ROOT/'prompts',rates)
+    rows=runner.run_standard_phase('actual_semantics',jobs,{})
+    assert len(rows)==1 and len(messages.calls)==1
+    assert messages.calls[0]['service_tier']=='standard_only'
+    assert messages.calls[0]['system'][0]['cache_control']=={'type':'ephemeral','ttl':'1h'}
+    assert runner.spent==pytest.approx(.4007) and runner.requests==121
+    acceptance=json.loads((tmp_path/'actual_semantics/acceptance.json').read_text())
+    assert acceptance['processing']=='standard' and acceptance['real_api_calls']==1
+    runner.budget=runner.spent+1e-8
+    with pytest.raises(RuntimeError,match='cannot reserve'):
+        runner.run_standard_phase('no_budget',jobs,{})
+    assert len(messages.calls)==1

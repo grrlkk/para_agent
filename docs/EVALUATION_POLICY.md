@@ -27,7 +27,7 @@
 
 사용자가 승인한 총 예산은 **$3.00**다. 검증 120회 후 두 기준 통과 시 실제 수정 50회, 정상 경로 총 170회다. 스키마·인용 검증 실패에는 항목당 최대 두 번의 형식 수정 요청만 허용한다. 판정 결과 때문에 재요청하지 않는다. 모든 요청과 재요청은 하나의 예산 장부를 공유하고, 최대 출력 및 캐시 미적중을 가정한 금액을 먼저 확보한다. 남은 예산이 부족하면 제출하지 않는다.
 
-Messages Batch API의 50% 할인과 공유 시스템 프롬프트의 1시간 캐시를 사용한다. 단가는 입력 $2/M, 출력 $10/M, 1시간 캐시 쓰기 $4/M, 읽기 $0.10/M에 Batch 할인 50%를 적용한다. 실제 캐시 적중 여부와 사용량은 응답에서 집계한다. 대부분의 Batch는 1시간 이내 처리되지만 각 Batch는 최대 24시간 걸릴 수 있다. [공식 가격](https://platform.claude.com/docs/en/about-claude/pricing), [Batch 처리](https://platform.claude.com/docs/en/build-with-claude/batch-processing), [캐시](https://platform.claude.com/docs/en/build-with-claude/prompt-caching)
+검증 120건은 Messages Batch API의 50% 할인, 실제 수정 50쌍은 **일반 Messages API**를 사용한다. 실제 수정 50쌍의 일반 API 전환은 검증 결과를 보기 전 사용자의 추가 지시에 따른다. 두 경로 모두 공유 시스템 프롬프트의 1시간 캐시를 사용한다. 단가는 입력 $2/M, 출력 $10/M, 1시간 캐시 쓰기 $4/M, 읽기 $0.10/M이며 검증 Batch에만 할인 50%를 적용한다. 실제 캐시 적중 여부와 사용량은 응답에서 집계한다. 대부분의 Batch는 1시간 이내 처리되지만 각 Batch는 최대 24시간 걸릴 수 있다. [공식 가격](https://platform.claude.com/docs/en/about-claude/pricing), [Batch 처리](https://platform.claude.com/docs/en/build-with-claude/batch-processing), [캐시](https://platform.claude.com/docs/en/build-with-claude/prompt-caching)
 
 ## 해석 한계와 기존 평가 유지
 

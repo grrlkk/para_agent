@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Freeze/cost, then run two Sonnet gates and conditional 50-pair reference analysis."""
+"""Run two Batch gates, then conditional standard-API 50-pair reference analysis."""
 import argparse
 from datetime import datetime, timezone
 import json
@@ -58,7 +58,8 @@ def prepare(directory):
         'decision_sha256': file_hash(directory / 'decision_before_results.json'),
         'prepared_utc': datetime.now(timezone.utc).isoformat()})
     write_json(directory / 'private/jobs.json', jobs)
-    plan = {'model': model.model, 'model_config': model.model_dump(), 'processing': 'batch',
+    plan = {'model': model.model, 'model_config': model.model_dump(),
+        'processing': {'validation': 'batch', 'actual_semantics': 'standard'},
         'prompt_caching': {'ttl': '1h', 'breakpoint': 'shared_system_prompt', 'hits_assumed': False},
         'validation_calls': 120, 'conditional_actual_calls': 50, 'maximum_calls_with_repairs': 510,
         'approved_budget_usd': decision['approved_budget_usd'], 'phases': {},
@@ -69,21 +70,34 @@ def prepare(directory):
         'provider_timing': 'Most batches within 1h; each batch may take up to 24h; two dependent phases plus budget partitions and repairs.'}
     for name, group in [('validation', jobs['controlled'] + jobs['original_pairs']),
                         ('actual_semantics', jobs['actual_semantics'])]:
+        factor = 2 if name == 'actual_semantics' else 1
         plan['phases'][name] = {'logical_calls': len(group),
-            'expected_usd_without_cache_hits': sum(j['expected_usd_without_hits'] for j in group),
-            'all_initial_requests_reserved_max_usd': sum(j['reserved_max_usd'] for j in group)}
+            'processing': 'standard' if factor == 2 else 'batch',
+            'expected_usd_without_cache_hits': factor * sum(j['expected_usd_without_hits'] for j in group),
+            'all_initial_requests_reserved_max_usd': factor * sum(j['reserved_max_usd'] for j in group)}
     plan['expected_total_usd_if_gates_pass'] = sum(p['expected_usd_without_cache_hits'] for p in plan['phases'].values())
     write_json(directory / 'plan.json', plan)
     status(directory, 'prepared_waiting_dispatch', actual_api_calls=0)
     return plan
 
 
-def execute(directory, approved_budget):
+def execute(directory, approved_budget, *, resume_validation=False):
     setup = json.loads((directory / 'setup.json').read_text())
     decision = json.loads((directory / 'decision_before_results.json').read_text())
     if approved_budget != decision['approved_budget_usd'] or approved_budget != 3.0:
         raise ValueError('This execution is authorized for a shared $3.00 budget only')
-    for name, digest in setup['source_hashes'].items():
+    source_hashes = setup['source_hashes']
+    amendment_path = directory / 'execution_amendment_01.json'
+    if resume_validation:
+        amendment = json.loads(amendment_path.read_text())
+        if (amendment['original_setup_sha256'] != file_hash(directory / 'setup.json')
+                or amendment['actual_semantics_processing'] != 'standard'
+                or not amendment['judge_inputs_and_gate_rules_unchanged']):
+            raise ValueError('Invalid user-requested transport amendment')
+        source_hashes = amendment['source_hashes']
+    elif amendment_path.exists():
+        raise ValueError('Use --resume-validation to retrieve the already accepted Batch without resubmission')
+    for name, digest in source_hashes.items():
         if file_hash(PROJECT / name) != digest:
             raise ValueError('Frozen source changed before dispatch')
     for name, digest in setup['frozen_data_hashes'].items():
@@ -110,7 +124,8 @@ def execute(directory, approved_budget):
     try:
         status(directory, 'validation_running', expected_judgments=120)
         records = runner.run_phase('validation', jobs['controlled'] + jobs['original_pairs'],
-            {s: setup['frozen_data_hashes'][f'{s}.json'] for s in ('controlled', 'original_pairs')})
+            {s: setup['frozen_data_hashes'][f'{s}.json'] for s in ('controlled', 'original_pairs')},
+            resume_pending=resume_validation)
         report = validate_fixed_sonnet(json.loads((directory / 'private/controlled.json').read_text()),
             json.loads((directory / 'private/original_pairs.json').read_text()), records)
         write_json(directory / 'gate_report.json', report)
@@ -118,8 +133,9 @@ def execute(directory, approved_budget):
             status(directory, 'stopped_failed_gate', spent_usd=runner.spent,
                    real_judge_requests=runner.requests, actual_semantics='not_run_by_stop_rule')
             return report
-        status(directory, 'actual_semantics_running', expected_judgments=50, spent_usd=runner.spent)
-        actual = runner.run_phase('actual_semantics', jobs['actual_semantics'],
+        status(directory, 'actual_semantics_running', expected_judgments=50, spent_usd=runner.spent,
+               processing='standard')
+        actual = runner.run_standard_phase('actual_semantics', jobs['actual_semantics'],
             {'actual_semantics': setup['frozen_data_hashes']['actual_semantics.json']})
         reference = compare_claude_reference(json.loads((directory / 'private/actual_semantics.json').read_text()),
                                             actual, Path(setup['reference_path']))
@@ -140,8 +156,11 @@ def main(argv=None):
     parser.add_argument('--data-dir', type=Path, required=True)
     parser.add_argument('--execute', action='store_true')
     parser.add_argument('--approved-budget-usd', type=float)
+    parser.add_argument('--resume-validation', action='store_true',
+                        help='Retrieve the accepted pending Batch after the recorded transport amendment')
     args = parser.parse_args(argv)
-    result = execute(args.data_dir.resolve(), args.approved_budget_usd) if args.execute else prepare(args.data_dir.resolve())
+    result = execute(args.data_dir.resolve(), args.approved_budget_usd,
+                     resume_validation=args.resume_validation) if args.execute else prepare(args.data_dir.resolve())
     print(json_text(result))
 
 

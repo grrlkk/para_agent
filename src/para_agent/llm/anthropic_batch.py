@@ -77,9 +77,18 @@ class BatchRunner:
         self.requests = 0
         self.http_posts = 0
 
-    def run_phase(self, name, jobs, source_hashes):
+    def run_phase(self, name, jobs, source_hashes, *, resume_pending=False):
         directory = self.output / name
-        directory.mkdir(parents=True, exist_ok=False)
+        if resume_pending:
+            batch_dir = directory / 'batches' / '001'
+            allowed = {'dispatch_intent.json', 'batch.json', 'latest_status.json'}
+            if (not (batch_dir / 'batch.json').is_file()
+                    or any(p.name not in allowed for p in batch_dir.iterdir())
+                    or len(list((directory / 'batches').iterdir())) != 1
+                    or any(p.name != 'batches' for p in directory.iterdir())):
+                raise ValueError('Resume requires one accepted pending batch without consumed results')
+        else:
+            directory.mkdir(parents=True, exist_ok=False)
         pending, records, batch_index = deepcopy(jobs), [], 0
         phase_start, requests_start = self.spent, self.requests
         ok = False
@@ -97,14 +106,21 @@ class BatchRunner:
                 batch_index += 1
                 batch_dir = directory / 'batches' / f'{batch_index:03d}'
                 wire = [{'custom_id': f'j{i:04d}', 'params': job['params']} for i, job in enumerate(chosen)]
-                write_json(batch_dir / 'dispatch_intent.json', {'requests': wire,
-                    'reserved_usd': reserved, 'spent_before_usd': self.spent,
-                    'jobs': [{k: j[k] for k in ('scope', 'item_id', 'reverse', 'attempt')} for j in chosen]})
-                # No automatic retry of a create request: an uncertain POST could already be charged.
-                self.http_posts += 1
-                batch = self.sdk.messages.batches.create(requests=wire)
+                if resume_pending and batch_index == 1:
+                    intent = json.loads((batch_dir / 'dispatch_intent.json').read_text())
+                    if intent['requests'] != wire or intent['spent_before_usd'] != self.spent:
+                        raise ValueError('Pending batch does not match the frozen requests or budget ledger')
+                    saved_batch = json.loads((batch_dir / 'batch.json').read_text())
+                    batch = self.sdk.messages.batches.retrieve(saved_batch['id'])
+                else:
+                    write_json(batch_dir / 'dispatch_intent.json', {'requests': wire,
+                        'reserved_usd': reserved, 'spent_before_usd': self.spent,
+                        'jobs': [{k: j[k] for k in ('scope', 'item_id', 'reverse', 'attempt')} for j in chosen]})
+                    # Never retry an uncertain create request, which might already be charged.
+                    self.http_posts += 1
+                    batch = self.sdk.messages.batches.create(requests=wire)
+                    write_json(batch_dir / 'batch.json', batch.model_dump(mode='json'))
                 self.requests += len(wire)
-                write_json(batch_dir / 'batch.json', batch.model_dump(mode='json'))
                 while batch.processing_status != 'ended':
                     status = batch.model_dump(mode='json')
                     (batch_dir / 'latest_status.json').write_text(json_text(status) + '\n')
@@ -158,3 +174,59 @@ class BatchRunner:
                 'real_api_calls': self.requests - requests_start,
                 'estimated_billed_usd': self.spent - phase_start, 'spent_total_usd': self.spent,
                 'approved_budget_usd': self.budget, 'processing': 'batch', 'prompt_cache_ttl': '1h'})
+
+    def run_standard_phase(self, name, jobs, source_hashes):
+        """Synchronous Messages requests sharing the same total budget ledger."""
+        directory = self.output / name
+        directory.mkdir(parents=True, exist_ok=False)
+        records, ok = [], False
+        phase_start, requests_start = self.spent, self.requests
+        try:
+            for original in jobs:
+                job = deepcopy(original)
+                for attempt in range(3):
+                    params = {**job['params'], 'service_tier': 'standard_only'}
+                    reserved = 2 * request_reservation(params, self.rates)
+                    if self.spent + reserved > self.budget:
+                        raise RuntimeError('Approved budget cannot reserve the next standard request; no dispatch')
+                    request_dir = directory / 'requests' / f'{len(records):03d}_{attempt}'
+                    write_json(request_dir / 'dispatch_intent.json', {
+                        'params': params, 'item_id': job['item_id'], 'attempt': attempt,
+                        'spent_before_usd': self.spent, 'reserved_usd': reserved})
+                    self.requests += 1
+                    self.http_posts += 1
+                    response = self.sdk.messages.create(**params)
+                    message = response.model_dump(mode='json')
+                    write_json(request_dir / 'response.json', message)
+                    self.spent += 2 * batch_cost(message['usage'], self.rates)
+                    write_json(request_dir / 'accounting.json', {'spent_total_usd': self.spent})
+                    if self.spent > self.budget:
+                        raise RuntimeError('Reported usage exceeded reservation; stop all further dispatch')
+                    if message['model'] != params['model'] or message['stop_reason'] != 'end_turn':
+                        raise RuntimeError('Unexpected model or incomplete standard response')
+                    raw = ''.join(b['text'] for b in message['content'] if b['type'] == 'text')
+                    try:
+                        parsed = parse_judgment(job, raw)
+                    except ValueError as exc:
+                        write_json(request_dir / 'invalid.json', {'error': str(exc)})
+                        if attempt == 2:
+                            raise ValueError('Judge output failed three schema/evidence checks') from None
+                        job['params']['messages'] += [{'role': 'assistant', 'content': raw},
+                            {'role': 'user', 'content': self.repair_prompt.replace('{error}', str(exc))}]
+                        continue
+                    record = {k: job[k] for k in ('scope', 'item_id', 'reverse')}
+                    record.update(result=parsed, model=message['model'], attempt=attempt)
+                    records.append(record)
+                    write_json(directory / 'items' / f"{job['scope']}_{job['item_id']}_0.json", record)
+                    write_json(directory / 'progress.json', {'completed': len(records), 'expected': len(jobs),
+                        'spent_total_usd': self.spent, 'processing': 'standard'})
+                    break
+            write_json(directory / 'results.json', records)
+            ok = True
+            return records
+        finally:
+            write_json(directory / 'acceptance.json', {'ok': ok, 'completed': len(records),
+                'expected': len(jobs), 'model': 'claude-sonnet-5-5', 'source_hashes': source_hashes,
+                'real_api_calls': self.requests - requests_start,
+                'estimated_billed_usd': self.spent - phase_start, 'spent_total_usd': self.spent,
+                'approved_budget_usd': self.budget, 'processing': 'standard', 'prompt_cache_ttl': '1h'})

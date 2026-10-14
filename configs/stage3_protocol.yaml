@@ -73,3 +73,5 @@ api:
   batch_discount: 0.5
   prompt_cache_ttl: 1h
   validation_then_actual_semantics: true
+  validation_processing: batch
+  actual_semantics_processing: standard
