@@ -1,0 +1,50 @@
+source: /home/chanwoo/essay_scoring_llm/essay_scoring_llm/rubrics.py
+source_sha256: 232fbfb2b07b2b88676f80c18887cb16d8e067a974e2e7dc7dc1e6ef5ae5ed80
+rubric_keys:
+- task_1
+- content_1
+- content_2
+- content_3
+- organization_1
+- organization_2
+- expression_1
+- expression_2
+rubric_names_ko:
+  task_1: 과제충실성
+  content_1: 설명명료성
+  content_2: 설명구체성
+  content_3: 설명적절성
+  organization_1: 문장연결성
+  organization_2: 글통일성
+  expression_1: 어휘적절성
+  expression_2: 어법적절성
+feature_keys:
+- C_Cnt
+- E_Cnt
+- F_Cnt
+- J_Cnt
+- X_Cnt
+- char_Cnt
+- word_Cnt
+- E_NDW
+- morph_NDW
+- morph_LenAvg
+- morph_LenStd
+- word_LenStd
+- grade_2_ratio
+- grade_3_ratio
+- grade_4_ratio
+- grade_m1_ratio
+- N_MSTTR
+- V_HDD
+- lemma_MATTR
+- 2-gram_NDW
+- NN_repRatio
+- word_sentLenAvg
+- 2-gram_RTTR
+- adjacent_sentence_overlap_function_lemmas
+- char_paraLenAvg
+- avgSentSimilarity
+- topicConsistency
+- text_dalechall
+- text_oridx

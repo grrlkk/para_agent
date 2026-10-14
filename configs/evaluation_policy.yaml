@@ -1,0 +1,46 @@
+version: post_stage1_5_v1
+primary_metrics: [cross_family_pairwise_judge, meaning_preservation_rate]
+auxiliary_metrics: [kanana_smoothed_integer_n64, kanana_greedy, style_consistency, edit_amount, cost]
+kanana:
+  role: auxiliary
+  method: integer_mean
+  n: 64
+  temperature: 1.0
+  generation_batch_size: 8
+  master_seed: 15042
+  seed_scheme: sha256_essay_id_v1
+  # Rule: int.from_bytes(SHA256(UTF8(f"15042:{essay_id}"))[:4], "big") % (2**31 - 1).
+  # Use the original essay ID for original text, every condition and every repeat.
+  # Same result assumes the same model/runtime, batch size and sampling settings.
+  record_greedy: true
+  conditional_expectation_average: false
+decision:
+  origin: user_approved_after_observing_stage1_5_results
+  post_result_selection: true
+  source_run: runs/20261014T124844.658852Z_fee9ddb861
+  original_n32_primary_adoption_rule: failed
+  original_rule_is_unchanged: true
+  confirmatory_experiment: not_requested_and_not_run
+  reasons:
+    - Smoothing reduced the large LF and contraction sensitivity seen with a single greedy line.
+    - Across 100 canonical originals, integer score block SD averaged 2.353 at N8, 1.583 at N16, and 1.016 at N32.
+    - N64 uses all saved samples to reduce Monte Carlo error; its single block cannot provide a between-block SD.
+    - N64 is an auxiliary choice made after results, not a retrospective pass of the original N32 primary rule.
+judge:
+  different_family_from_agent: true
+  pairwise_orders: [whole_once_first, incremental_first]
+  allow_tie: true
+  model_selection: ask_user_before_stage3_api_calls
+  human_agreement:
+    required_in_stage: 3
+    status: pending
+    label_source: null
+    sample_size: null
+    agreement_threshold: null
+    tasks: [pairwise_preference, three_class_meaning_preservation]
+    report: [exact_agreement_rate, confusion_matrix, disagreement_examples]
+    freeze_sample_and_rules_before_judge_results: true
+    completion_requires_actual_human_labels: true
+live_calls:
+  estimate_call_count_and_cost_first: true
+  explicit_user_approval_required: true

@@ -1,0 +1,11 @@
+# Draft adapted to the actual Kanana keys; expert review remains necessary (§4.3).
+# Names: configs/contracts.yaml. No score thresholds or external distributions.
+task_1: [분량]
+content_1: [문장 간 내용 응집성]
+content_2: [글의 난도, 사고 도구어 사용, 분량]
+content_3: []
+organization_1: [문장 간 내용 응집성, 문장 간 표현 응집성, 문장의 길이]
+organization_2: [문단 간 내용 응집성, 문단의 길이]
+expression_1: [표현의 다양성, 표현의 적절성, 어휘의 수준, 어휘의 다양성]
+expression_2: []
+

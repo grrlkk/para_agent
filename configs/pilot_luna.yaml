@@ -1,0 +1,57 @@
+# Stage 3 only: same audited split, first five essays, both conditions.
+condition: incremental
+use_memory: true
+diag_unit: both
+delta_mode: prev
+reviser_input: x_only
+k_issues: 4
+weak_rubrics: 2
+llm:
+  agent:
+    provider: openai
+    model: gpt-6-luna
+    temperature: 0
+    reasoning_effort: none
+    max_output_tokens: 8192
+    timeout_s: 180
+  judge:
+    provider: mock
+    model: mock-judge-v0
+    temperature: 0
+  env_file: /home/chanwoo/FEAK-Agent/.env
+data:
+  min_paras: 3
+  max_paras: 6
+  n_essays: 5
+  mock_input: tests/fixtures/mock_essays.jsonl
+  seed: 42
+  split_output: data/splits
+  source:
+    test_jsonl: /home/chanwoo/FEAK-Agent/data/data_jsonl/test.jsonl
+    train_jsonl: /home/chanwoo/FEAK-Agent/data/data_jsonl/train.jsonl
+    raw_test_dir: /home/chanwoo/FEAK-Agent/data/raw_datasets/test
+    audit_manifest: /home/chanwoo/FEAK-Agent/verak/v3/data/audit_index.json
+    training_evidence: /home/chanwoo/FEAK-Agent/feak_tc_docs/중간정리/CORRUPTION_GEN_DECISIONS_2026-07-22.md
+scorer:
+  package_path: /home/chanwoo/essay_scoring_llm
+  backend: verak.v3.score.kanana.KananaScorer
+  repository_path: /home/chanwoo/FEAK-Agent
+  source_config: /home/chanwoo/FEAK-Agent/verak/v3/config.yaml
+  cache_dir: .cache/scorer
+  metadata_dir: data/scorer_metadata/d905597c30a3f943
+features:
+  package_path: /home/chanwoo/essay_scoring_llm
+  entrypoint: essay_scoring_llm.feak_feature.extract_features
+  env_file: /home/chanwoo/essay_scoring_llm/.env
+  timeout_s: 300
+  gpu: 1
+kb:
+  features: data/kb/features.jsonl
+  feature_key_map: configs/feature_key_map.yaml
+paths:
+  prompts: prompts
+  runs: runs
+  cache: .cache/llm
+  contracts: configs/contracts.yaml
+  rubric_diag_map: configs/rubric_diag_map.yaml
+  rubric_unit_map: configs/rubric_unit_map.yaml

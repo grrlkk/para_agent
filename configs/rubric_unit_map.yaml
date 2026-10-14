@@ -1,0 +1,11 @@
+# Not used by diag_unit=both: retain all para/cum results without selecting by rubric.
+# Reserved only if a selective hybrid is requested after inspecting those results.
+task_1: null
+content_1: null
+content_2: null
+content_3: null
+organization_1: null
+organization_2: null
+expression_1: null
+expression_2: null
+

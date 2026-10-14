@@ -1,0 +1,15 @@
+{
+  "summarizer": {
+    "issues": [],
+    "keep_style": "원문의 문체 유지 (mock)",
+    "connect_note": null,
+    "learner_feedback": "현상: mock 실행 / 근거 문장: 분석하지 않음 / 수정 예시: 원문 유지"
+  },
+  "reviser": {"revised_paragraph": "", "applied_issue_ids": [], "skipped": []},
+  "memory_update": {
+    "error_notes": [],
+    "profile_update": {"style_notes": "mock 실행: 원문을 유지함"},
+    "turn_summary": "mock 실행으로 원문을 유지했다."
+  }
+}
+
