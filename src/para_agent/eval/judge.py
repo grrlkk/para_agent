@@ -4,9 +4,21 @@ from pydantic import Field
 from para_agent.schema import Schema
 
 
+class ContentAddition(Schema):
+    status: Literal['있음','없음','판단불가']
+    added_spans: list[str]
+    reason: str = Field(min_length=1)
+
+
+class ComparedAdditions(Schema):
+    A: ContentAddition
+    B: ContentAddition
+
+
 class SemanticJudgment(Schema):
     label: Literal['보존','경미한 뉘앙스 변화','의미 변화']
     reason: str = Field(min_length=1)
+    content_addition: ContentAddition
 
 
 class Preference(Schema):
@@ -19,6 +31,7 @@ class PairwiseJudgment(Schema):
     coherence: Preference
     meaning: Preference
     overall: Preference
+    content_addition: ComparedAdditions
 
 
 def semantic_payload(item):
@@ -37,11 +50,34 @@ def restore_order(winner,reverse):
 
 
 def judge_semantic(client,item,*,context):
-    return client.request('judge_semantic',semantic_payload(item),SemanticJudgment,context=context)
+    def validate(result):
+        validate_addition(result.content_addition,item['after'])
+    return client.request('judge_semantic',semantic_payload(item),SemanticJudgment,context=context,validate=validate)
+
+
+def validate_addition(value,text,*,original_available=True):
+    if not original_available and value.status!='판단불가':
+        raise ValueError('Original text unavailable: content addition must be undetermined')
+    if value.status=='있음' and not value.added_spans:
+        raise ValueError('Content addition requires literal evidence')
+    if value.status!='있음' and value.added_spans:
+        raise ValueError('Only a positive addition finding may have added spans')
+    if any(not s.strip() or s not in text for s in value.added_spans):
+        raise ValueError('Content addition evidence must occur literally in the displayed text')
 
 
 def judge_pairwise(client,item,*,context,reverse=False):
-    result=client.request('judge_pairwise',pairwise_payload(item,reverse=reverse),PairwiseJudgment,context=context)
-    return {'displayed':result.model_dump(),'canonical':{
+    payload=pairwise_payload(item,reverse=reverse)
+    def validate(result):
+        if item.get('original') is None and result.meaning.winner != '동률':
+            raise ValueError('Original text unavailable: meaning preservation cannot be compared')
+        for side in ('A','B'):
+            validate_addition(getattr(result.content_addition,side),payload[side],
+                              original_available=item.get('original') is not None)
+    result=client.request('judge_pairwise',payload,PairwiseJudgment,context=context,validate=validate)
+    canonical={
         key:{'winner':restore_order(value.winner,reverse),'reason':value.reason}
-        for key,value in ((k,getattr(result,k)) for k in ('style','coherence','meaning','overall'))}}
+        for key,value in ((k,getattr(result,k)) for k in ('style','coherence','meaning','overall'))}
+    canonical['content_addition']={side:getattr(result.content_addition,restore_order(side,reverse)).model_dump()
+                                   for side in ('A','B')}
+    return {'displayed':result.model_dump(),'canonical':canonical}

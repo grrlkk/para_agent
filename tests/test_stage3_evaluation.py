@@ -119,9 +119,12 @@ def test_blind_judge_payloads_and_reverse_winner_mapping():
     class Fake:
         def request(self, agent, payload, schema, **kwargs):
             assert not set(payload) & {'gold', 'agent_model', 'human_scores', 'condition'}
-            return PairwiseJudgment.model_validate({
+            data = {
                 k: {'winner': '동률' if k == 'meaning' else 'A', 'reason': '글에 근거한 이유'}
-                for k in ('style', 'coherence', 'meaning', 'overall')})
+                for k in ('style', 'coherence', 'meaning', 'overall')}
+            data['content_addition'] = {side: {'status': '판단불가', 'added_spans': [], 'reason': '원문 미제공'}
+                                        for side in ('A', 'B')}
+            return PairwiseJudgment.model_validate(data)
     result = judge_pairwise(Fake(), item, context={}, reverse=True)
     assert result['displayed']['overall']['winner'] == 'A'
     assert result['canonical']['overall']['winner'] == 'B'

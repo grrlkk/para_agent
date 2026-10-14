@@ -1,4 +1,4 @@
-version: stage3_luna_v1
+version: stage3_luna_v2_judge_content_flags
 agent_model: gpt-6-luna
 judge_family: anthropic
 judge_model: null  # Select only after all three validation gates have results.
