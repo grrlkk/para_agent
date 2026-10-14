@@ -175,14 +175,22 @@ class BatchRunner:
                 'estimated_billed_usd': self.spent - phase_start, 'spent_total_usd': self.spent,
                 'approved_budget_usd': self.budget, 'processing': 'batch', 'prompt_cache_ttl': '1h'})
 
-    def run_standard_phase(self, name, jobs, source_hashes):
+    def run_standard_phase(self, name, jobs, source_hashes, *, completed_prefix=(), completed_cost_usd=0):
         """Synchronous Messages requests sharing the same total budget ledger."""
+        if len(completed_prefix) > len(jobs) or not 0 <= completed_cost_usd <= self.spent:
+            raise ValueError('Invalid completed-prefix ledger')
+        for job, record in zip(jobs, completed_prefix):
+            if (any(job[k] != record[k] for k in ('scope', 'item_id', 'reverse'))
+                    or record['model'] != job['params']['model'] or record['attempt'] != 0):
+                raise ValueError('Completed prefix must match successful initial requests in order')
         directory = self.output / name
         directory.mkdir(parents=True, exist_ok=False)
-        records, ok = [], False
-        phase_start, requests_start = self.spent, self.requests
+        records, ok = deepcopy(list(completed_prefix)), False
+        phase_start, requests_start = self.spent - completed_cost_usd, self.requests - len(records)
+        for record in records:
+            write_json(directory / 'items' / f"{record['scope']}_{record['item_id']}_0.json", record)
         try:
-            for original in jobs:
+            for original in jobs[len(records):]:
                 job = deepcopy(original)
                 for attempt in range(3):
                     params = {**job['params'], 'service_tier': 'standard_only'}
@@ -218,8 +226,10 @@ class BatchRunner:
                     record.update(result=parsed, model=message['model'], attempt=attempt)
                     records.append(record)
                     write_json(directory / 'items' / f"{job['scope']}_{job['item_id']}_0.json", record)
-                    write_json(directory / 'progress.json', {'completed': len(records), 'expected': len(jobs),
-                        'spent_total_usd': self.spent, 'processing': 'standard'})
+                    progress = directory / 'progress.tmp'
+                    progress.write_text(json_text({'completed': len(records), 'expected': len(jobs),
+                        'spent_total_usd': self.spent, 'processing': 'standard'}) + '\n')
+                    progress.replace(directory / 'progress.json')
                     break
             write_json(directory / 'results.json', records)
             ok = True

@@ -206,15 +206,23 @@ def test_standard_phase_never_uses_batch_and_shares_full_price_budget(tmp_path,r
                 'usage':{'input_tokens':100,'output_tokens':50}})
     messages=Messages();runner=BatchRunner(SimpleNamespace(messages=messages),rates,3,tmp_path,'repair')
     runner.spent=.4;runner.requests=120
-    jobs=make_jobs('actual_semantics',[semantic_item()],model(),PROJECT_ROOT/'prompts',rates)
+    jobs=make_jobs('actual_semantics',[semantic_item(i) for i in range(3)],model(),PROJECT_ROOT/'prompts',rates)
     rows=runner.run_standard_phase('actual_semantics',jobs,{})
-    assert len(rows)==1 and len(messages.calls)==1
+    assert len(rows)==3 and len(messages.calls)==3
     assert messages.calls[0]['service_tier']=='standard_only'
     assert messages.calls[0]['system'][0]['cache_control']=={'type':'ephemeral','ttl':'1h'}
-    assert runner.spent==pytest.approx(.4007) and runner.requests==121
+    assert runner.spent==pytest.approx(.4021) and runner.requests==123
     acceptance=json.loads((tmp_path/'actual_semantics/acceptance.json').read_text())
-    assert acceptance['processing']=='standard' and acceptance['real_api_calls']==1
+    assert acceptance['processing']=='standard' and acceptance['real_api_calls']==3
+    assert json.loads((tmp_path/'actual_semantics/progress.json').read_text())['completed']==3
     runner.budget=runner.spent+1e-8
     with pytest.raises(RuntimeError,match='cannot reserve'):
         runner.run_standard_phase('no_budget',jobs,{})
-    assert len(messages.calls)==1
+    assert len(messages.calls)==3
+    # Reuse a completed prefix without calling either already-paid item again.
+    runner.budget=3
+    runner.spent=.4014;runner.requests=122
+    resumed=runner.run_standard_phase('resumed',jobs,{},completed_prefix=rows[:2],completed_cost_usd=.0014)
+    assert len(resumed)==3 and len(messages.calls)==4
+    assert json.loads(messages.calls[-1]['messages'][0]['content'])==jobs[2]['payload']
+    assert runner.spent==pytest.approx(.4021) and runner.requests==123

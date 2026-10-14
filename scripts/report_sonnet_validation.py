@@ -34,7 +34,9 @@ def report(directory):
     if state['state'] not in {'completed', 'stopped_failed_gate', 'failed'}:
         raise ValueError('Run is still active; no partial results report')
     setup = read(directory / 'setup.json')
-    amendment = directory / 'execution_amendment_01.json'
+    amendment = directory / 'recovery_01.json'
+    if not amendment.exists():
+        amendment = directory / 'execution_amendment_01.json'
     source_hashes = read(amendment)['source_hashes'] if amendment.exists() else setup['source_hashes']
     for relative, digest in source_hashes.items():
         if file_hash(PROJECT / relative) != digest:
@@ -48,7 +50,10 @@ def report(directory):
         responses.extend((path.relative_to(directory).parts[0], row['result'], .5)
                          for row in read(path))
     for path in sorted(directory.glob('*/requests/*/response.json')):
-        responses.append((path.relative_to(directory).parts[0], {'type': 'succeeded', 'message': read(path)}, 1))
+        phase = path.relative_to(directory).parts[0]
+        if phase == 'actual_semantics_interrupted':
+            phase = 'actual_semantics'
+        responses.append((phase, {'type': 'succeeded', 'message': read(path)}, 1))
     for phase, outcome, discount in responses:
         totals['returned_requests'] += 1
         totals[outcome['type']] += 1
